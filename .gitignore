@@ -2,3 +2,15 @@
 course_material/
 *.zip
 *.pdf
+
+# Ignore docs directory
+docs/
+
+# Ignore the .vscode directory
+.vscode/
+
+# Ignore virtual environment directories
+venv/
+.venv/
+
+
