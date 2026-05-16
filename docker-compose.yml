@@ -1,0 +1,84 @@
+services:
+  # --- HDFS NameNode ---
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: namenode
+    hostname: namenode
+    ports:
+      - "9870:9870"  #Interface web HDFS NameNode
+      - "8020:8020"  #API interne HDFS
+    environment:
+      - CLUSTER_NAME=local-cluster
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:8020
+
+    volumes:
+      - ./data/namenode:/hadoop/dfs/name
+    networks:
+      - spark-network
+
+  # --- HDFS DataNode ---
+  datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode
+    environment:
+      - CORE_CONF_fs_defaultFS=hdfs://namenode:8020
+    volumes:
+      - ./data/datanode:/hadoop/dfs/data
+    depends_on:
+      - namenode
+    networks:
+      - spark-network
+
+  # --- Spark Master (image officielle Apache) ---
+  spark-master:
+    image: apache/spark:3.5.1-python3 
+    container_name: spark-master
+    hostname: spark-master
+    user: root
+    ports:
+      - "8080:8080"   #spark-master (UI Spark)
+      - "7077:7077"   #spark-master (API Spark)
+    command: >
+      /bin/bash -c "
+        /opt/spark/sbin/start-master.sh &&
+        tail -f /opt/spark/logs/*"
+    environment:
+      - SPARK_MASTER_HOST=spark-master
+    networks:
+      - spark-network
+
+  # --- Spark Worker ---
+  spark-worker:
+    image: apache/spark:3.5.1-python3  
+    container_name: spark-worker
+    user: root
+    command: >
+      /bin/bash -c "
+        /opt/spark/sbin/start-worker.sh spark://spark-master:7077 &&
+        tail -f /opt/spark/logs/*"
+    environment:
+      - SPARK_WORKER_MEMORY=2g
+      - SPARK_WORKER_CORES=2
+    depends_on:
+      - spark-master
+    networks:
+      - spark-network
+
+  # --- Jupyter ---
+  jupyter:
+    image: jupyter/pyspark-notebook:spark-3.5.0  
+    container_name: jupyter
+    ports:
+      - "8888:8888"
+    environment:
+      - SPARK_MASTER=spark://spark-master:7077
+    volumes:
+      - ./notebooks:/home/notebooks
+    depends_on:
+      - spark-master
+    networks:
+      - spark-network
+
+networks:
+  spark-network:
+    driver: bridge
