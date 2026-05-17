@@ -1,43 +1,75 @@
+# ============================================================
+# INFOH515 - Big Data Analytics (ULB) - Project 2025-2026
+# Architecture: HDFS + Spark cluster + Jupyter
+# ============================================================
+#
+# USAGE:
+#   Premier lancement:  docker compose up --build
+#   Suivants:           docker compose up
+#   Arrêt:              docker compose down
+#   Arrêt + wipe HDFS:  docker compose down -v
+#
+# PORTS:
+#   http://localhost:8888  → Jupyter Notebook
+#   http://localhost:8080  → Spark Master UI
+#   http://localhost:9870  → HDFS Web UI
+#
+# OLLAMA: doit tourner sur Windows
+#   → ollama pull llama3.2:3b
+#   → ollama serve
+# ============================================================
+
 services:
-  # --- HDFS NameNode ---
+
+  # ------------------------------------------------------------
+  # HDFS NameNode
+  # ------------------------------------------------------------
   namenode:
     image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
     container_name: namenode
     hostname: namenode
     ports:
-      - "9870:9870"  #Interface web HDFS NameNode
-      - "8020:8020"  #API interne HDFS
+      - "9870:9870"
+      - "8020:8020"
     environment:
-      - CLUSTER_NAME=local-cluster
+      - CLUSTER_NAME=infoh515
       - CORE_CONF_fs_defaultFS=hdfs://namenode:8020
-
+      - HDFS_CONF_dfs_replication=1
+      - HDFS_CONF_dfs_permissions_enabled=false
     volumes:
-      - ./data/namenode:/hadoop/dfs/name
+      - hdfs_namenode:/hadoop/dfs/name
     networks:
       - spark-network
 
-  # --- HDFS DataNode ---
+  # ------------------------------------------------------------
+  # HDFS DataNode
+  # ------------------------------------------------------------
   datanode:
     image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
     container_name: datanode
     environment:
       - CORE_CONF_fs_defaultFS=hdfs://namenode:8020
+      - HDFS_CONF_dfs_replication=1
+      - HDFS_CONF_dfs_permissions_enabled=false
+      - SERVICE_PRECONDITION=namenode:9870
     volumes:
-      - ./data/datanode:/hadoop/dfs/data
+      - hdfs_datanode:/hadoop/dfs/data
     depends_on:
       - namenode
     networks:
       - spark-network
 
-  # --- Spark Master (image officielle Apache) ---
+  # ------------------------------------------------------------
+  # Spark Master
+  # ------------------------------------------------------------
   spark-master:
-    image: apache/spark:3.5.1-python3 
+    image: apache/spark-py:v3.3.2
     container_name: spark-master
     hostname: spark-master
     user: root
     ports:
-      - "8080:8080"   #spark-master (UI Spark)
-      - "7077:7077"   #spark-master (API Spark)
+      - "8080:8080"
+      - "7077:7077"
     command: >
       /bin/bash -c "
         /opt/spark/sbin/start-master.sh &&
@@ -47,9 +79,11 @@ services:
     networks:
       - spark-network
 
-  # --- Spark Worker ---
+  # ------------------------------------------------------------
+  # Spark Worker
+  # ------------------------------------------------------------
   spark-worker:
-    image: apache/spark:3.5.1-python3  
+    image: apache/spark-py:v3.3.2
     container_name: spark-worker
     user: root
     command: >
@@ -64,20 +98,37 @@ services:
     networks:
       - spark-network
 
-  # --- Jupyter ---
+  # ------------------------------------------------------------
+  # Jupyter — image officielle avec PySpark intégré
+  # Dockerfile ajoute uniquement les librairies du projet
+  # La config HDFS se fait directement dans SparkConf (pas de fichiers)
+  # ------------------------------------------------------------
   jupyter:
-    image: jupyter/pyspark-notebook:spark-3.5.0  
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: jupyter
     ports:
       - "8888:8888"
+      - "4040:4040"
     environment:
       - SPARK_MASTER=spark://spark-master:7077
+      - HDFS_URI=hdfs://namenode:8020
+      - OLLAMA_HOST=http://host.docker.internal:11434
     volumes:
-      - ./notebooks:/home/notebooks
+      - ./notebooks:/home/jovyan/work
+      - ./course_material:/home/jovyan/work/data 
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - spark-master
+      - namenode
     networks:
       - spark-network
+
+volumes:
+  hdfs_namenode:
+  hdfs_datanode:
 
 networks:
   spark-network:
