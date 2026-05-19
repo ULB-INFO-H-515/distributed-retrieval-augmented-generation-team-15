@@ -1,0 +1,501 @@
+\documentclass[a4paper,11pt]{article}
+
+% ── Packages ──────────────────────────────────────────────────────────────────
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+
+\usepackage{amsmath, amssymb}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{multirow}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{parskip}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+
+% ── Code listing style ─────────────────────────────────────────────────────────
+\definecolor{codebg}{RGB}{245,245,245}
+\definecolor{codegreen}{RGB}{0,128,0}
+\definecolor{codepurple}{RGB}{128,0,128}
+\definecolor{codered}{RGB}{180,0,0}
+
+\lstdefinestyle{pythonstyle}{
+  backgroundcolor=\color{codebg},
+  commentstyle=\color{codegreen},
+  keywordstyle=\color{codepurple}\bfseries,
+  stringstyle=\color{codered},
+  basicstyle=\ttfamily\footnotesize,
+  breaklines=true,
+  captionpos=b,
+  keepspaces=true,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  showspaces=false,
+  showstringspaces=false,
+  language=Python,
+  frame=single,
+  rulecolor=\color{gray!40},
+  xleftmargin=1.5em,
+  framexleftmargin=1.5em,
+}
+\lstset{style=pythonstyle}
+
+% ── Header / footer ────────────────────────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{\small INFO-H-515 — Project 2025–2026}
+\lhead{\small Distributed RAG System}
+\cfoot{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ── Section title formatting ───────────────────────────────────────────────────
+\titleformat{\section}{\large\bfseries}{}{0em}{}[\titlerule]
+\titleformat{\subsection}{\normalsize\bfseries}{}{0em}{}
+\titleformat{\subsubsection}{\normalsize\itshape}{}{0em}{}
+
+% ── Hyperref ───────────────────────────────────────────────────────────────────
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!60!black,
+  citecolor=blue!60!black,
+  urlcolor=blue!60!black,
+}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\begin{document}
+
+% ── Title page ────────────────────────────────────────────────────────────────
+\begin{titlepage}
+  \centering
+  \vspace*{2cm}
+  {\Large \textsc{Université Libre de Bruxelles}\\[0.3em]
+   \textsc{École Polytechnique de Bruxelles}\\[0.3em]
+   \textsc{Faculté des Sciences}\par}
+  \vspace{1.5cm}
+  \rule{\linewidth}{0.5pt}\\[0.4cm]
+  {\LARGE \textbf{INFO-H-515: Big Data}\\[0.3em]
+   Distributed Data Management and Scalable Analytics\\[0.3em]
+   \large Project Report 2025–2026\par}
+  \rule{\linewidth}{0.5pt}\\[1.5cm]
+
+  {\large \textbf{Distributed Retrieval-Augmented Generation (RAG) System\\
+  for Automatic Exam Question Generation}}\\[2cm]
+
+  \begin{tabular}{ll}
+    \textbf{Authors:} & Author One \\
+                      & Author Two \\
+                      & Author Three \\
+                      & Author Four \\[1em]
+    \textbf{Academic year:} & 2025–2026 \\
+    \textbf{Date:}          & May 2026 \\
+  \end{tabular}
+
+  \vfill
+  {\small Supervisors: Dimitris Sacharidis, Gianluca Bontempi, Cédric Simar,
+  Martin Colot, Antonios Kontaxakis}
+\end{titlepage}
+
+% ── Table of contents ─────────────────────────────────────────────────────────
+\tableofcontents
+\newpage
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Introduction}
+
+The goal of this project is to design and implement a \textbf{Distributed
+Retrieval-Augmented Generation (RAG) system} capable of automatically
+generating exam questions from a corpus of course-material PDFs.
+The system is built on top of Apache Spark (PySpark) to ensure scalability,
+and integrates classical and neural embedding techniques alongside a Large
+Language Model (LLM) for question generation.
+
+The project is divided into three tasks:
+\begin{enumerate}[noitemsep]
+  \item \textbf{Task 1} — Ingestion, preprocessing, chunking, embedding, and
+        storage of the PDF corpus.
+  \item \textbf{Task 2} — Semantic retrieval of relevant chunks and LLM-based
+        exam question generation.
+  \item \textbf{Task 3} — Comprehensive evaluation of retrieval quality,
+        generation quality, and system performance.
+\end{enumerate}
+
+This report describes the architecture, design choices, and experimental
+results for each task.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Overall System Architecture}
+
+\subsection{Pipeline Overview}
+
+The pipeline follows a classic RAG architecture adapted to a distributed
+setting, as depicted below:
+
+\begin{enumerate}[noitemsep]
+  \item PDF documents are read in parallel from an input directory.
+  \item Each document is converted to page-level raw text, cleaned, and
+        split into overlapping word-based chunks.
+  \item Each chunk is embedded using one of three strategies: TF-IDF,
+        Word2Vec, or SBERT.
+  \item Chunks and their embeddings are stored in Parquet format on HDFS,
+        alongside rich traceability metadata.
+  \item At query time, the user query is embedded with the same strategy,
+        and the top-$k$ most similar chunks are retrieved via a distance
+        metric.
+  \item Retrieved chunks are injected into a structured prompt, which is
+        sent to a local LLM to generate grounded exam questions with
+        citations.
+\end{enumerate}
+
+\subsection{Distributed Processing with PySpark}
+
+The pipeline makes extensive use of PySpark's RDD API:
+\begin{itemize}[noitemsep]
+  \item \texttt{sc.parallelize} distributes the list of PDF file paths across
+        available executor cores.
+  \item \texttt{flatMap} is used to expand each PDF into its constituent pages,
+        and again to expand each cleaned page into its chunks.
+  \item \texttt{map} applies the cleaning function page by page in a
+        data-parallel fashion.
+  \item \texttt{filter} (optionally enabled) removes empty or near-empty
+        pages before chunking.
+  \item \texttt{collect} gathers chunks onto the driver before fitting
+        global models such as TF-IDF or SBERT, which require access to the
+        full corpus.
+\end{itemize}
+
+The architecture is horizontally scalable: adding executor cores or nodes
+directly reduces the ingestion and cleaning time, as each PDF page is an
+independent unit of work. The main bottleneck is the embedding step, which
+is CPU/GPU-bound and is discussed further in Task~3.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Task 1: Preprocessing, Tokenization, and Embeddings}
+
+\subsection{Configuration}
+
+All pipeline parameters are centralised in a single \texttt{RAGConfig}
+dataclass, making the notebook reproducible and easy to reconfigure:
+
+\begin{lstlisting}
+@dataclass
+class RAGConfig:
+    pdf_path: str = "course_material"
+    chunk_size_words: int  = 200
+    chunk_overlap_words: int = 50
+    top_k: int = 4
+    similarity_metric: str = "cosine"   # {"cosine", "euclidean"}
+    embedding_strategy: str = "sbert"   # {"tfidf", "sbert", "word2vec"}
+    sbert_model_name: str = "sentence-transformers/all-MiniLM-L6-v2"
+    gen_model_name: str = "google/flan-t5-small"
+    max_new_tokens: int = 256
+\end{lstlisting}
+
+\subsection{PDF Ingestion}
+
+PDF files are discovered with \texttt{Path.glob("*.pdf")} and the resulting
+list of paths is distributed via \texttt{sc.parallelize}. Text extraction
+relies on the \texttt{pypdf} library (\texttt{PdfReader}), which provides
+page-level access without requiring a native PDF renderer. For each page,
+the following metadata fields are recorded immediately at extraction time:
+
+\begin{table}[H]
+  \centering
+  \caption{Metadata fields captured at ingestion}
+  \begin{tabularx}{\linewidth}{lX}
+    \toprule
+    \textbf{Field} & \textbf{Description} \\
+    \midrule
+    \texttt{pdf\_name}  & Filename of the source PDF \\
+    \texttt{page\_num}  & 1-based page index within the document \\
+    \texttt{text}       & Raw extracted text for that page \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{Text Cleaning}
+
+Raw text extracted from PDFs frequently contains artefacts that degrade
+retrieval quality. The \texttt{clean\_text} function applies the following
+transformations in order:
+
+\begin{enumerate}[noitemsep]
+  \item \textbf{Hyphenation removal}: end-of-line hyphens (\texttt{-\textbackslash n})
+        are deleted, rejoining words split across lines.
+  \item \textbf{Line-break normalisation}: remaining newlines are replaced by
+        spaces.
+  \item \textbf{Whitespace collapsing}: runs of whitespace are reduced to a
+        single space via the regex \texttt{\textbackslash s+}.
+  \item \textbf{Strip}: leading and trailing whitespace is removed.
+\end{enumerate}
+
+A filter step (currently commented out but configurable) discards pages whose
+cleaned text is shorter than 50 characters, eliminating blank or
+nearly-blank pages that would otherwise introduce noise into the index.
+
+All cleaning operations are applied with \texttt{pages\_rdd.map(clean\_text)},
+keeping the transformation fully distributed.
+
+\subsection{Chunking}
+
+\subsubsection{Rationale for chunk size and overlap}
+
+The chunk size is set to \textbf{200 words} with an overlap of \textbf{50 words}
+(25\%), giving a step size of 150 words. This configuration was chosen for
+the following reasons:
+
+\begin{itemize}[noitemsep]
+  \item 200 words corresponds roughly to one to two paragraphs of academic
+        text, a natural semantic unit that tends to cover a single concept or
+        definition without excessive dilution.
+  \item An overlap of 25\% ensures that definitions or formulas that straddle
+        a boundary are captured in at least one chunk, reducing the risk of
+        retrieving a chunk that contains only half of a key idea.
+  \item The chosen size fits comfortably within the context window of small
+        LLMs (e.g.\ \texttt{flan-t5-small}), and several chunks can be
+        concatenated for larger models without hitting the token limit.
+\end{itemize}
+
+Both \texttt{chunk\_size\_words} and \texttt{chunk\_overlap\_words} are
+exposed as configuration parameters and can be tuned without modifying the
+pipeline code.
+
+\subsubsection{Implementation}
+
+The \texttt{word\_based\_chunk\_page} function splits the cleaned text of a
+single page on whitespace and slides a window of size
+\texttt{chunk\_size\_words} with step \texttt{chunk\_size\_words - chunk\_overlap\_words}.
+Each chunk is assigned the following metadata:
+
+\begin{table}[H]
+  \centering
+  \caption{Metadata fields added at chunking}
+  \begin{tabularx}{\linewidth}{lX}
+    \toprule
+    \textbf{Field} & \textbf{Description} \\
+    \midrule
+    \texttt{chunk\_id}  & Unique identifier of the form \texttt{p\{page\}\_c\{index\}} \\
+    \texttt{pdf\_name}  & Propagated from the page record \\
+    \texttt{page\_num}  & Propagated from the page record \\
+    \texttt{text}       & Space-joined words of the chunk \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+A guard raises \texttt{ValueError} if \texttt{overlap\_words $\geq$ chunk\_size\_words},
+preventing an infinite loop. The transformation is applied with
+\texttt{clean\_rdd.flatMap(word\_based\_chunk\_page)}, producing one RDD
+element per chunk across all pages and all documents.
+
+\subsection{Embeddings}
+
+After chunking, \texttt{clean\_chunk\_rdd.collect()} brings all chunks to the
+Spark driver. This is necessary because TF-IDF requires a global vocabulary
+fit, Word2Vec requires a global training pass, and SBERT's batch encoding is
+most efficient when run on the full corpus at once. Three embedding strategies
+are supported.
+
+\subsubsection{TF-IDF (Sparse Lexical Baseline)}
+
+\texttt{TfidfVectorizer} from scikit-learn is fitted on all chunk texts and
+produces a sparse matrix $X \in \mathbb{R}^{N \times |V|}$, where $N$ is the
+number of chunks and $|V|$ the vocabulary size. TF-IDF is parameter-free in
+our configuration and serves as the baseline for exact term matching.
+
+\begin{lstlisting}
+vectorizer = TfidfVectorizer()
+X = vectorizer.fit_transform([c["text"] for c in chunks])
+\end{lstlisting}
+
+\subsubsection{Word2Vec (Distributional Semantics)}
+
+A Word2Vec model is trained from scratch on the tokenised chunks using the
+gensim library. Each chunk is embedded by averaging the vectors of its
+known words:
+
+\[
+  \mathbf{e}_{\text{chunk}} =
+  \frac{1}{|\mathcal{W}|} \sum_{w \in \mathcal{W}} \mathbf{v}_w,
+  \quad \mathcal{W} = \{w \in \text{chunk} \mid w \in \text{vocab}\}
+\]
+
+If no word in the chunk is in the vocabulary (e.g.\ a chunk consisting
+entirely of rare tokens), a zero vector is returned. The model uses
+\texttt{vector\_size=100}, \texttt{window=5}, \texttt{min\_count=2}, and
+\texttt{epochs=10}.
+
+\subsubsection{SBERT (Contextual Dense Embeddings)}
+
+Sentence-BERT produces contextualised embeddings via a transformer encoder
+with mean pooling. The model \texttt{all-MiniLM-L6-v2} (384 dimensions) is
+used for its strong quality-to-speed trade-off. Embeddings are
+$\ell_2$-normalised at encoding time (\texttt{normalize\_embeddings=True}),
+so that cosine similarity reduces to a dot product at retrieval time:
+
+\begin{lstlisting}
+model = SentenceTransformer(model_name)
+emb = model.encode(texts, show_progress_bar=True,
+                   normalize_embeddings=True)
+emb = np.asarray(emb, dtype=np.float32)
+\end{lstlisting}
+
+\subsection{Storage (HDFS Parquet)}
+
+A SparkSession is created from the existing SparkContext to gain access to the
+DataFrame API required for Parquet serialisation. The
+\texttt{save\_to\_hdfs\_parquet} function assembles a list of tuples
+matching the following schema and writes it to HDFS:
+
+\begin{table}[H]
+  \centering
+  \caption{Parquet schema for the embedding index}
+  \begin{tabularx}{\linewidth}{llX}
+    \toprule
+    \textbf{Field} & \textbf{Spark type} & \textbf{Description} \\
+    \midrule
+    \texttt{id}                 & \texttt{LongType}              & Sequential integer identifier \\
+    \texttt{source\_pdf}        & \texttt{StringType}            & Source PDF filename \\
+    \texttt{page\_num}          & \texttt{IntegerType}           & Page number (1-based) \\
+    \texttt{chunk\_id}          & \texttt{StringType}            & Chunk identifier \\
+    \texttt{start\_word}        & \texttt{StringType}            & First word of the chunk \\
+    \texttt{end\_word}          & \texttt{StringType}            & Last word of the chunk \\
+    \texttt{chunk\_text}        & \texttt{StringType}            & Full chunk text \\
+    \texttt{embedding}          & \texttt{ArrayType(FloatType)}  & Dense or sparse embedding vector \\
+    \texttt{embedding\_strategy}& \texttt{StringType}            & Strategy used (\texttt{tfidf}, \texttt{word2vec}, \texttt{sbert}) \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+The DataFrame is written in \texttt{overwrite} mode to
+\texttt{hdfs://namenode:8020/<output\_dir>}, which allows idempotent
+re-runs. Separate output directories are used per embedding strategy.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Task 2: Retrieval and Generation}
+\label{sec:task2}
+
+\textit{This section will be completed once Task~2 is implemented.
+The following subsections outline the planned architecture.}
+
+\subsection{Retrieval}
+
+Given a user query, the system will:
+\begin{enumerate}[noitemsep]
+  \item Embed the query using the \textbf{same} strategy and model that was
+        used to build the index (ensuring comparable vector spaces).
+  \item Load the Parquet index from HDFS.
+  \item Compute pairwise similarity or distance between the query vector and
+        all stored embeddings.
+  \item Return the top-$k$ chunks ranked by score.
+\end{enumerate}
+
+The system supports two distance metrics (implemented from scratch without
+external libraries, as required):
+
+\paragraph{Cosine similarity.}
+\[
+  \text{sim}(\mathbf{a}, \mathbf{b})
+  = \frac{\mathbf{a} \cdot \mathbf{b}}{\|\mathbf{a}\| \, \|\mathbf{b}\|}
+\]
+Higher values indicate greater similarity; chunks are sorted in descending
+order.
+
+\paragraph{Euclidean distance.}
+\[
+  d(\mathbf{a}, \mathbf{b})
+  = \sqrt{\sum_{i=1}^{n} (a_i - b_i)^2}
+\]
+Lower values indicate greater proximity; chunks are sorted in ascending order.
+
+\subsection{LLM Integration and Prompt Construction}
+
+Retrieved chunks will be injected into a structured prompt that instructs the
+model to generate grounded exam questions. The prompt enforces the following
+constraints:
+\begin{itemize}[noitemsep]
+  \item Use \textbf{only} the provided sources.
+  \item Cite every question and answer key with \texttt{[n]} references.
+  \item Include both conceptual questions and, where relevant, formula-based
+        derivations.
+\end{itemize}
+
+The generator backend is Ollama with \texttt{llama3.2:3b}, called from the
+Spark driver after \texttt{.collect()} to avoid executor-side HTTP calls.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Task 3: Evaluation}
+\label{sec:task3}
+
+\textit{This section will be completed once Task~3 is implemented.
+The subsections below describe the planned evaluation methodology.}
+
+\subsection{Retrieval Metrics}
+
+Precision@$k$ and Recall@$k$ will be reported for each embedding strategy
+and distance metric against a manually annotated gold set of query–page
+pairs.
+
+\[
+  \text{Precision@}k = \frac{|\text{retrieved}_{k} \cap \text{relevant}|}{k},
+  \qquad
+  \text{Recall@}k = \frac{|\text{retrieved}_{k} \cap \text{relevant}|}{|\text{relevant}|}
+\]
+
+\subsection{Generation and Grounding Metrics}
+
+Generated questions will be evaluated on relevance, correctness,
+faithfulness, citation support, clarity, and format adherence, using a
+5-point rubric applied by manual inspection.
+
+\subsection{System Performance Metrics}
+
+Wall-clock latency, throughput (chunks/second), token counts (input and
+output), and memory footprint will be reported for varying values of
+\texttt{parallelism}, \texttt{chunk\_size}, and \texttt{chunk\_overlap}.
+Spark UI screenshots will be included.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Conclusion}
+
+Task~1 of the distributed RAG pipeline has been implemented and validated.
+The PySpark notebook reads a directory of PDF files, cleans and chunks the
+text in a fully distributed fashion, produces three flavours of embeddings
+(TF-IDF, Word2Vec, SBERT), and stores the resulting index in HDFS Parquet
+with rich traceability metadata. The configuration is centralised in
+\texttt{RAGConfig}, making the system reproducible and easy to extend for
+Tasks~2 and~3.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\appendix
+\section{Software Dependencies}
+
+\begin{table}[H]
+  \centering
+  \caption{Main libraries used in the project}
+  \begin{tabularx}{\linewidth}{llX}
+    \toprule
+    \textbf{Library} & \textbf{Version} & \textbf{Role} \\
+    \midrule
+    PySpark              & 3.x    & Distributed RDD / DataFrame processing \\
+    pypdf                & $\geq$3 & PDF text extraction \\
+    scikit-learn         & $\geq$1 & TF-IDF vectorisation \\
+    gensim               & $\geq$4 & Word2Vec training \\
+    sentence-transformers& $\geq$2 & SBERT encoding \\
+    numpy                & $\geq$1.24 & Dense matrix operations \\
+    pandas               & $\geq$2 & Evaluation DataFrames \\
+    requests             & —      & Ollama HTTP client \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\end{document}
