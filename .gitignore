@@ -1,4 +1,33 @@
-# Ignore the course material directory and projets descriptions
+# Ignore the course material directory and projects descriptions
 course_material/
 *.zip
-*.pdf
+
+# Python
+__pycache__/
+*.pyc
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Spark
+spark-warehouse/
+metastore_db/
+
+# Outputs
+outputs/
+
+# Serialized/vector files
+*.npz
+*.pkl
+*.parquet
+
+# VSCode
+.vscode/
+
+# System
+.DS_Store
+Thumbs.db
+
+# PDFs (optional)
+data/pdfs/
+!data/pdfs/.gitkeep
