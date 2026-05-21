@@ -1,5 +1,5 @@
 # Ignore the course material directory and projets descriptions
-course_material/
+notebooks/course_material/
 *.zip
 *.pdf
 
