@@ -1,0 +1,131 @@
+{
+  "timestamp": "2026-05-21T10:27:19.779869",
+  "embedding_strategy": "sbert",
+  "similarity_metric": "cosine",
+  "k": 5,
+  "model": "llama3.2:3b",
+  "results": {
+    "What is MapReduce and how does it work?": {
+      "parse_success": true,
+      "n_questions": 2,
+      "tokens_in": 802,
+      "tokens_out": 123,
+      "total_time_s": 39.399,
+      "questions": [
+        {
+          "question": "What is the computational model of MapReduce?",
+          "answer": "The MapReduce framework consists of two user-de\ufb01ned functions, called Map and Reduce. The Map function receives a key-value pair and produces an intermediate key-value pair as output. The Reduce function receives an intermediate key and its set of values and merges them to generate a (typically) smaller set of values.",
+          "citations": [
+            "1 p.19 chunk_id:p19_c3"
+          ]
+        },
+        {
+          "question": "How does the MapReduce framework work?",
+          "answer": "The master JobTracker is responsible for scheduling jobs for the slaves, monitoring them and re-executing the failed tasks. The slaves execute the tasks as directed by the master.",
+          "citations": [
+            "2 p.27 chunk_id:p27_c2"
+          ]
+        }
+      ],
+      "refusal": null
+    },
+    "How does HDFS handle fault tolerance?": {
+      "parse_success": true,
+      "n_questions": 2,
+      "tokens_in": 450,
+      "tokens_out": 95,
+      "total_time_s": 26.142,
+      "questions": [
+        {
+          "question": "What is the primary purpose of replication in HDFS for fault tolerance?",
+          "answer": "To ensure durability and availability of data by storing multiple copies of each block across different DataNodes.",
+          "citations": [
+            "1-intro.pdf p.52 chunk_id:p52_c0"
+          ]
+        },
+        {
+          "question": "How does HDFS handle the failure of a single DataNode for fault tolerance?",
+          "answer": "HDFS can continue to operate with the failed DataNode, and the remaining DataNodes will take over the missing block(s) from the failed node.",
+          "citations": [
+            "1-intro.pdf p.52 chunk_id:p52_c0"
+          ]
+        }
+      ],
+      "refusal": null
+    },
+    "What is the CAP theorem?": {
+      "parse_success": true,
+      "n_questions": 2,
+      "tokens_in": 598,
+      "tokens_out": 123,
+      "total_time_s": 35.234,
+      "questions": [
+        {
+          "question": "What are the three properties of the CAP theorem, and how do they relate to each other?",
+          "answer": "The three properties of the CAP theorem are consistency, availability, and partition tolerance. According to the theorem, at most two out of these three properties can be achieved at any given moment in time.",
+          "citations": [
+            "1-intro.pdf p.34 chunk_id:p34_c0",
+            "2-source:5-nosql.pdf page:35 chunk_id:p35_c0"
+          ]
+        },
+        {
+          "question": "What is the tradeoff between consistency and availability according to the CAP theorem?",
+          "answer": "The CAP theorem reveals that there is a tradeoff between consistency and availability. Strict consistency cannot be achieved together with availability and partition tolerance.",
+          "citations": [
+            "3-a_TowardScalableSystemsForBigDataAnalytics.pdf page:19 chunk_id:p19_c0",
+            "4-source:5-nosql.pdf page:36 chunk_id:p36_c0"
+          ]
+        }
+      ],
+      "refusal": null
+    },
+    "Explain RDD lineage in Spark.": {
+      "parse_success": true,
+      "n_questions": 2,
+      "tokens_in": 459,
+      "tokens_out": 89,
+      "total_time_s": 22.406,
+      "questions": [
+        {
+          "question": "What is the purpose of an RDD's lineage graph?",
+          "answer": "The lineage graph represents the dependency between RDDs and their partitions, allowing Spark to recover data in case of node failures.",
+          "citations": [
+            "3-stream_proc.pdf p.112 chunk_id:p112_c0"
+          ]
+        },
+        {
+          "question": "How does Spark ensure that input data is available for recomputation?",
+          "answer": "Spark replicates the input stream data to ensure it's available, and enables write ahead logging to prevent data loss.",
+          "citations": [
+            "3-stream_proc.pdf p.112 chunk_id:p112_c0"
+          ]
+        }
+      ],
+      "refusal": null
+    },
+    "How does LSH work for similarity search?": {
+      "parse_success": true,
+      "n_questions": 2,
+      "tokens_in": 855,
+      "tokens_out": 111,
+      "total_time_s": 36.348,
+      "questions": [
+        {
+          "question": "What is the key ingredient that makes LSH useful for similarity search?",
+          "answer": "There must exist a hash-function h such that P[ h(x)=h(y) ] increases with sim(x,y).",
+          "citations": [
+            "4-stream_algos.pdf p.85 chunk_id:p85_c0"
+          ]
+        },
+        {
+          "question": "How do the basis functions for Euclidean distance in LSH contribute to its effectiveness?",
+          "answer": "A set of basis functions can be obtained by choosing random lines and projecting points onto those lines.",
+          "citations": [
+            "Finding Similar Items.pdf p.61 chunk_id:p61_c2"
+          ]
+        }
+      ],
+      "refusal": null
+    }
+  }
+}
